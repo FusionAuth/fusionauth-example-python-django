@@ -1,0 +1,3 @@
+*.pyc
+*.DB_Store
+*.sqlite3

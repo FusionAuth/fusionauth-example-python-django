@@ -1,0 +1,23 @@
+<html>
+    <head>
+        <title>SUPER PRIVATE INFO!!</title>
+    </head>
+
+    <body>
+        <h1>This is private information (<a href="{% url 'logout' %}">Logout</a>)</h1>
+        <p>You are logged in as {{user_id}} {{test}}</p>
+        {% if message %}
+            <font color="red">
+                <h3>{{message}}</h3>
+            </font>
+        {% endif %}
+        <p>Your birthday is {{birthday}}</p>
+        <p>Please enter your birthday</p>
+        <form action="/dashboard" method="POST">
+            {% csrf_token %}
+            <input type="text" name="birthday" placeholder="When were you born">
+            <input type="hidden" name="user_id" value="{{user_id}}">
+            <input type="Submit" value="SEND">
+        </form>
+    </body>
+</html>
