@@ -3,6 +3,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.shortcuts import render, redirect, reverse
 from django.views.generic import View
+import pkce
 
 from fusionauth.fusionauth_client import FusionAuthClient
 
@@ -16,8 +17,13 @@ def get_or_create_user(user_id, request):
 
 
 def get_login_url(request):
+    if request.session.has_key('pkce_verifier') is False or request.session.has_key('code_challenge') is False:
+        code_verifier = pkce.generate_code_verifier(length=128)
+        code_challenge = pkce.get_code_challenge(code_verifier)
+        request.session['pkce_verifier'] = code_verifier
+        request.session['code_challenge'] = code_challenge
     redirect_url = request.build_absolute_uri(reverse("dashboard"))
-    login_url = f"{settings.FUSION_AUTH_BASE_URL}/oauth2/authorize?client_id={settings.FUSION_AUTH_APP_ID}&redirect_uri={redirect_url}&response_type=code"
+    login_url = f"{settings.FUSION_AUTH_BASE_URL}/oauth2/authorize?client_id={settings.FUSION_AUTH_APP_ID}&redirect_uri={redirect_url}&response_type=code&code_challenge={request.session['code_challenge']}&code_challenge_method=S256"
     login_url = login_url.format(
         settings.FUSION_AUTH_BASE_URL, settings.FUSION_AUTH_APP_ID,
     )
@@ -35,10 +41,11 @@ def is_user_login_ok(request):
         return False
     try:
         redirect_url = request.build_absolute_uri(reverse("dashboard"))
-        r = client.exchange_o_auth_code_for_access_token(
+        r = client.exchange_o_auth_code_for_access_token_using_pkce(
             code,
             redirect_url,
-            settings.FUSION_AUTH_APP_ID,
+            request.session['pkce_verifier'],
+            settings.CLIENT_ID,
             settings.FUSION_AUTH_CLIENT_SECRET,
         )
 
@@ -49,7 +56,7 @@ def is_user_login_ok(request):
             get_or_create_user(user_id, request)
             return user_id
         else:
-            print("could not exchnage code for token")
+            print("could not exchange code for token")
             print(r.error_response)
             return False
     except Exception as e:
@@ -159,6 +166,7 @@ class DashboardView(View):
 
 class LogoutView(View):
     def get(self, request, *args, **kwargs):
+        request.session.clear()
         redirect_url = request.build_absolute_uri("home")
         url = f"{settings.FUSION_AUTH_BASE_URL}/oauth2/logout?client_id={settings.FUSION_AUTH_APP_ID}"
         return redirect(url)
